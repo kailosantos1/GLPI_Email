@@ -1,0 +1,355 @@
+forms:
+  flexsmart:
+    id: 5
+    name: Solicitações sistema FlexSmart
+    keywords:
+    - flexsmart
+    - flex smart
+    - flex
+    - sistema flex
+    - sistema flexsmart
+    - solicitações flexsmart
+    - solicitacoes flexsmart
+    - problema flexsmart
+    - erro flexsmart
+    - erro no flex
+    - problema no flex
+    - flex não funciona
+    - flex nao funciona
+    - flex travando
+    - flex travou
+    - flex parou
+    - liberação de telas
+    - liberacao de telas
+    - liberar telas
+    - liberar tela
+    - liberação de tela
+    - liberacao de tela
+    - liberação
+    - liberacao
+    - liberar
+    - erp
+    - ERP
+    - sistema erp
+    - problema no sistema
+    - problema com o sistema
+    - acesso ao sistema
+    - acesso ao erp
+    - erro no sistema
+    - erro no erp
+    questions:
+      tipo_atendimento:
+        id: 106
+        label: Qual o tipo de atendimento você deseja?
+        required: true
+        options:
+        - Liberação
+        - Outro
+      qual_liberacao:
+        id: 107
+        label: Qual Liberação?
+        required: true
+        depends_on:
+          field: tipo_atendimento
+          value: Liberação
+        options:
+        - Telas
+        - Outros
+      qual_tela:
+        id: 108
+        label: Qual tela?
+        required: true
+        depends_on:
+          field: qual_liberacao
+          value: Telas
+      qual_liberacao_sistema:
+        id: 111
+        label: Qual liberação será feita no sistema?
+        required: true
+        depends_on:
+          field: qual_liberacao
+          value: Outros
+      liberacao_para_usuario:
+        id: 109
+        label: A liberação é para qual usuário?
+        required: true
+        depends_on:
+          field: tipo_atendimento
+          value: Liberação
+        options:
+        - Usuario Atual
+        - Outro Usuario
+      nome_usuario:
+        id: 110
+        label: Qual o nome do usuário?
+        required: true
+        depends_on:
+          field: liberacao_para_usuario
+          value: Outro Usuario
+      descricao_problema:
+        id: 42
+        label: Descreva o problema
+        required: true
+      canal_contato:
+        id: 73
+        label: Qual o melhor canal para entrarmos em contato com você?
+        required: true
+        options:
+        - Microsoft Teams
+        - WhatsApp
+        - OPA
+      whatsapp:
+        id: 74
+        label: Insira o número do WhatsApp
+        required: true
+        depends_on:
+          field: canal_contato
+          value: WhatsApp
+      email_teams:
+        id: 75
+        label: Insira o email do Microsoft Teams
+        required: true
+        depends_on:
+          field: canal_contato
+          value: Microsoft Teams
+      urgencia:
+        id: 112
+        label: Qual a urgência do chamado?
+        required: true
+        options:
+        - Baixa
+        - Média
+        - Alta
+  manutencao:
+    id: 1
+    name: Solicitações de Manutenção
+    keywords:
+    - manutencao
+    - manutenção
+    - manutençao
+    - defeito
+    - estragou
+    - lento
+    - lenta
+    - problema
+    - computador
+    - impressora
+    - erro
+    - quebrado
+    - quebrada
+    - não funciona
+    - nao funciona
+    - travando
+    - travou
+    - parou de funcionar
+    - sem internet
+    - sem rede
+    - sem sinal
+    - monitor
+    - teclado
+    - mouse
+    - tela
+    - tela azul
+    - tela preta
+    - não liga
+    - nao liga
+    - não conecta
+    - nao conecta
+    - reiniciando
+    - reinicia
+    - desliga
+    - desligando
+    - aquecendo
+    - esquentando
+    - barulho
+    - barulhento
+    - atualização
+    - atualizacao
+    - instalar
+    - instalação
+    - instalacao
+    - desinstalar
+    - software
+    - programa
+    - aplicativo
+    - sistema
+    - windows
+    - login
+    - senha
+    - acesso
+    - vpn
+    - email
+    - e-mail
+    - outlook
+    - office
+    - excel
+    - word
+    - pasta
+    - arquivo
+    - servidor
+    - rede
+    - wifi
+    - wi-fi
+    - cabo
+    - tomada
+    - energia
+    - bateria
+    - carregador
+    - fonte
+    - placa
+    - memoria
+    - memória
+    - hd
+    - ssd
+    - processador
+    - placa de video
+    - placa de vídeo
+    - som
+    - audio
+    - áudio
+    - microfone
+    - camera
+    - câmera
+    - webcam
+    - fone
+    - headset
+    - impressora
+    - scanner
+    - digitalizador
+    - toner
+    - tinta
+    - papel
+    - atolado
+    - atolou
+    - mancha
+    - borrado
+    - falha
+    - bug
+    - erro
+    - crash
+    - congelou
+    - travado
+    - pendente
+    - lentidão
+    - lentidao
+    - demorando
+    - demora
+    - carregando
+    - não abre
+    - nao abre
+    - não fecha
+    - nao fecha
+    - não salva
+    - nao salva
+    - sumiu
+    - desapareceu
+    - apagou
+    - perdi
+    - perdeu
+    - corrompido
+    - corrompeu
+    - vírus
+    - virus
+    - malware
+    - hackeado
+    - invadiram
+    - spam
+    - estranho
+    - diferente
+    - esquisito
+    - anormal
+    - comportamento
+    - ajuda
+    - socorro
+    - urgente
+    - emergencia
+    - emergência
+    - preciso de ajuda
+    - me ajuda
+    - socorro
+    - estou com problema
+    questions:
+      tipo_solicitacao:
+        id: 2
+        label: Qual o tipo da solicitação?
+        required: true
+        options:
+        - Manutenção de Equipamentos
+        - Manutenção de Sistemas
+        - Acessos
+      sistema_problema:
+        id: 104
+        label: Qual sistema está com problema?
+        required: true
+        depends_on:
+          field: tipo_solicitacao
+          value: Manutenção de Sistemas
+        options:
+        - FlexSmart
+        - Outros Sistemas
+      equipamento:
+        id: 26
+        label: Qual o equipamento ou sistema referente à solicitação?
+        required: true
+        options:
+        - Computador/Hardware
+        - Periféricos (Webcam/Impressora)
+        - Smartphone/Mobile
+        - Sistemas/Softwares
+        - Servidores/Pastas de Arquivos
+        - Internet/Páginas da Web
+        - Outros
+      descricao_problema:
+        id: 3
+        label: 'Descreva o problema ou solicitação:'
+        required: true
+      local_solicitacao:
+        id: 6
+        label: Qual o local da solicitação?
+        required: true
+        options:
+        - Matriz
+        - Filial
+      filial:
+        id: 7
+        label: 'Escolha a sua Filial:'
+        required: true
+        depends_on:
+          field: local_solicitacao
+          value: Filial
+        options:
+        - Maravilha
+        - Lages
+        - Videira
+        - Concordia
+        - Catanduvas
+      canal_contato:
+        id: 70
+        label: Qual o melhor canal para contato?
+        required: true
+        options:
+        - Microsoft Teams
+        - WhatsApp
+        - OPA
+      whatsapp:
+        id: 71
+        label: Qual o número do seu WhatsApp com DDD?
+        required: true
+        depends_on:
+          field: canal_contato
+          value: WhatsApp
+      email_teams:
+        id: 72
+        label: Qual o seu e-mail do Microsoft Teams?
+        required: true
+        depends_on:
+          field: canal_contato
+          value: Microsoft Teams
+      urgencia:
+        id: 4
+        label: Qual a urgência do chamado?
+        required: true
+        options:
+        - Baixa
+        - Média
+        - Alta

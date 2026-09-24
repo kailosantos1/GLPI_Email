@@ -1,0 +1,9 @@
+{
+  "motivo": "Erro simulado no teste",
+  "timestamp": 1790255263,
+  "email": {
+    "remetente": "teste.erro@compasi.com.br",
+    "assunto": "Teste de erro",
+    "corpo": "Corpo qualquer"
+  }
+}
