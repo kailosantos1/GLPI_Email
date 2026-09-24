@@ -4,11 +4,10 @@ Loop principal com:
   - Item 2: salva e-mails com erro em disco pra análise manual
   - Item 3: logging em arquivo (bot.log)
   - Item 7: corpo truncado (já tratado no email_reader)
+  - Abordagem D: Gemini decide se é chamado ou não antes de classificar
 
-Fase 1: pós-processamento (requerente + limpeza de atores) feito no
-        glpi_client.criar_chamado.
-Fase 2: auto-reply HTML de confirmação pro solicitante, usando o ID
-        do ticket REAL (não do FormAnswer) e nome amigável do form.
+Fase 1: pós-processamento (requerente + limpeza de atores) no glpi_client.
+Fase 2: auto-reply HTML de confirmação pro solicitante.
 """
 
 import html
@@ -24,7 +23,7 @@ from email_reader import buscar_emails_novos
 from email_sender import enviar_email
 from glpi_client import GLPIClient
 from ad_parser import extrair_info_dn
-from triagem import classificar_email, classificar_problema
+from triagem import classificar_email, classificar_problema, e_chamado
 from logger_setup import configurar_logging, get_logger
 
 
@@ -37,10 +36,8 @@ log = get_logger(__name__)
 PASTA_ERROS = "emails_com_erro"
 MAX_ERROS_CONSECUTIVOS = 5
 
-# Cor do texto no tema dark do GLPI (extraída do CSS .timeline-content)
 COR_TEXTO_GLPI = "#85bd81"
 
-# Nome amigável dos formulários (pra aparecer no auto-reply)
 NOMES_FORMS = {
     "manutencao": "Manutenção",
     "flexsmart":  "FlexSmart",
@@ -64,24 +61,19 @@ signal.signal(signal.SIGTERM, _handler_saida)
 # Limpeza do corpo do e-mail
 # ---------------------------------------------------------------------
 def _limpar_corpo(corpo: str) -> str:
-    """Normaliza quebras, colapsa linhas e escapa HTML."""
     if not corpo:
         return ""
-
     corpo = corpo.replace("\r\n", "\n").replace("\r", "\n")
     corpo = "\n".join(linha.rstrip() for linha in corpo.split("\n"))
     corpo = re.sub(r"\n{3,}", "\n\n", corpo)
     corpo = corpo.strip()
     corpo = html.escape(corpo)
-
     return corpo
 
 
 def montar_descricao(email_msg: dict, info: dict) -> str:
-    """Corpo limpo + <div> com cor verde do tema."""
     corpo_limpo = _limpar_corpo(email_msg["corpo"]) or "(corpo vazio)"
     corpo_html = corpo_limpo.replace("\n", "<br>")
-
     return (
         f'<div style="color: {COR_TEXTO_GLPI}; font-family: sans-serif; '
         'font-size: 14px; margin: 0; padding: 0;">'
@@ -95,7 +87,6 @@ def montar_descricao(email_msg: dict, info: dict) -> str:
 # ---------------------------------------------------------------------
 def montar_html_confirmacao(nome: str, ticket_id, tipo: str,
                             unidade: str, canal: str) -> str:
-    """Template HTML profissional pro e-mail de confirmação."""
     nome = nome or "Colaborador(a)"
     unidade_fmt = unidade.capitalize() if unidade else "—"
     ticket_str = f"#{ticket_id}" if ticket_id else "—"
@@ -104,27 +95,33 @@ def montar_html_confirmacao(nome: str, ticket_id, tipo: str,
 <html>
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body style="margin:0; padding:0; background-color:#f4f6f8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f4f6f8; padding: 30px 15px;">
     <tr>
       <td align="center">
+
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px; background-color:#ffffff; border-radius:8px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); overflow:hidden;">
 
           <tr>
-            <td style="background: linear-gradient(135deg, #2e7d32 0%, #4caf50 100%); padding: 28px 30px; color:#ffffff;">
-              <h1 style="margin:0; font-size:20px; font-weight:600; color:#ffffff;">✅ Chamado aberto com sucesso</h1>
-              <p style="margin:6px 0 0 0; font-size:14px; opacity:0.9; color:#ffffff;">
+            <td style="background-color:#ffffff; padding: 28px 30px; border-bottom: 3px solid #4caf50;">
+              <h1 style="margin:0; font-size:20px; font-weight:600; color:#000000; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+                ✅ Chamado aberto com sucesso
+              </h1>
+              <p style="margin:6px 0 0 0; font-size:14px; color:#000000; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
                 Sua solicitação foi registrada no sistema de TI
               </p>
             </td>
           </tr>
 
           <tr>
-            <td style="padding: 28px 30px; color:#333333; font-size:14px; line-height:1.6;">
-              <p style="margin:0 0 18px 0;">Olá <strong>{nome}</strong>,</p>
+            <td style="padding: 28px 30px; color:#000000; font-size:14px; line-height:1.6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
 
-              <p style="margin:0 0 18px 0;">
+              <p style="margin:0 0 18px 0; color:#000000;">Olá <strong>{nome}</strong>,</p>
+
+              <p style="margin:0 0 18px 0; color:#000000;">
                 Recebemos sua solicitação e ela já foi registrada no nosso sistema de atendimento.
                 Em breve um técnico irá analisar e entrar em contato.
               </p>
@@ -135,19 +132,19 @@ def montar_html_confirmacao(nome: str, ticket_id, tipo: str,
                     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
                       <tr>
                         <td style="padding: 4px 0; font-size:13px; color:#666666; width:120px;">Número</td>
-                        <td style="padding: 4px 0; font-size:13px; color:#333333; font-weight:600;">{ticket_str}</td>
+                        <td style="padding: 4px 0; font-size:13px; color:#000000; font-weight:600;">{ticket_str}</td>
                       </tr>
                       <tr>
                         <td style="padding: 4px 0; font-size:13px; color:#666666;">Tipo</td>
-                        <td style="padding: 4px 0; font-size:13px; color:#333333;">{tipo}</td>
+                        <td style="padding: 4px 0; font-size:13px; color:#000000;">{tipo}</td>
                       </tr>
                       <tr>
                         <td style="padding: 4px 0; font-size:13px; color:#666666;">Unidade</td>
-                        <td style="padding: 4px 0; font-size:13px; color:#333333;">{unidade_fmt}</td>
+                        <td style="padding: 4px 0; font-size:13px; color:#000000;">{unidade_fmt}</td>
                       </tr>
                       <tr>
                         <td style="padding: 4px 0; font-size:13px; color:#666666;">Canal de contato</td>
-                        <td style="padding: 4px 0; font-size:13px; color:#333333;">{canal}</td>
+                        <td style="padding: 4px 0; font-size:13px; color:#000000;">{canal}</td>
                       </tr>
                     </table>
                   </td>
@@ -158,11 +155,12 @@ def montar_html_confirmacao(nome: str, ticket_id, tipo: str,
                 Se precisar adicionar mais informações, basta responder este e-mail
                 ou entrar em contato pelo canal escolhido.
               </p>
+
             </td>
           </tr>
 
           <tr>
-            <td style="background-color:#f8fafb; padding: 18px 30px; border-top:1px solid #e8ecef; text-align:center; font-size:12px; color:#999999;">
+            <td style="background-color:#f8fafb; padding: 18px 30px; border-top:1px solid #e8ecef; text-align:center; font-size:12px; color:#999999; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
               <p style="margin:0;">Equipe de TI · COMPASI Implementos Rodoviários</p>
               <p style="margin:6px 0 0 0;">Este é um e-mail automático. Não responda diretamente.</p>
             </td>
@@ -205,6 +203,12 @@ def processar_email(glpi: GLPIClient, email_msg: dict):
     remetente = email_msg["remetente"]
     corpo = email_msg["corpo"] or email_msg["assunto"]
 
+    # ---- Abordagem D: isso é um chamado de verdade? ----
+    if not e_chamado(corpo):
+        log.info("IGNORADO: '%s' — não parece chamado de TI", remetente)
+        return
+
+    # ---- Trava 2: usuário precisa existir no GLPI ----
     usuario = glpi.buscar_usuario_por_email(remetente)
     if usuario is None:
         log.warning("BLOQUEADO: '%s' não existe no GLPI", remetente)
@@ -246,7 +250,6 @@ def processar_email(glpi: GLPIClient, email_msg: dict):
         tipo_problema=tipo_problema,
     )
 
-    # Pega os DOIS ids: formanswer (id) e ticket real (ticket_id)
     formanswer_id = resultado.get("id")
     ticket_id = resultado.get("ticket_id")
 

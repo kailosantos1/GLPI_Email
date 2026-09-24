@@ -1,12 +1,14 @@
 """
 Classificação do e-mail:
-  1) Escolhe QUAL formulário (manutencao vs flexsmart) por keyword
-  2) Classifica o TIPO do problema (Impressora, Rede, ...) por keyword
-  3) Só cai no Gemini se NENHUMA keyword bateu
+  1) Verifica se o texto é um chamado de TI de verdade (Abordagem D)
+     - Se keyword FORTE de TI bateu → é chamado
+     - Senão → pergunta ao Gemini "é chamado?"
+  2) Escolhe QUAL formulário (manutencao vs flexsmart) por keyword
+  3) Classifica o TIPO do problema (Impressora, Rede, ...) por keyword
+  4) Só cai no Gemini se NENHUMA keyword bateu
 
 TEM RATE LIMIT: a cota gratuita do Gemini é baixa (~15 req/min).
-Pra não estourar, usamos um throttle de 5s entre chamadas e cache
-de 24h por texto.
+Pra não estourar, usamos throttle de 5s entre chamadas e cache de 24h.
 """
 
 import hashlib
@@ -23,7 +25,6 @@ from forms_loader import carregar_formularios
 _gemini_cache = {}
 _GEMINI_CACHE_TTL = 24 * 60 * 60
 
-# Controle de throttle (intervalo mínimo entre chamadas)
 _ultima_chamada_gemini = 0
 _GEMINI_INTERVALO_MIN = 5.0  # segundos
 
@@ -128,7 +129,42 @@ CATEGORIAS_GEMINI = sorted(set(KEYWORDS_TIPO.values()))
 
 
 # ---------------------------------------------------------------------
-# Chamada ao Gemini: com throttle + cache + retry
+# Keywords consideradas "fortes o suficiente" pra decidir sozinhas que
+# o texto é um chamado de TI. As outras keywords (email, acesso, senha,
+# sistema, etc.) só ajudam a CLASSIFICAR o tipo, mas não bastam como
+# prova de que é chamado (senão "olhe o email tal" viraria chamado).
+# ---------------------------------------------------------------------
+KEYWORDS_FORTES = {
+    # Impressora
+    "impressora", "impressao", "imprimir", "toner", "atolando", "atolou",
+    "multifuncional", "xerox", "scanner",
+
+    # Rede
+    "wifi", "wi-fi", "vpn", "internet", "caiu", "caindo",
+    "sem conexão", "sem conexao", "cabeamento",
+
+    # Desempenho
+    "lento", "lenta", "lentidão", "lentidao", "travando", "travou",
+    "travado", "tela azul", "congelou",
+
+    # Hardware
+    "computador", "monitor", "teclado", "mouse", "notebook", "gabinete",
+    "memória", "memoria", "hd", "ssd", "bateria", "carregador",
+    "quebrou", "quebrado", "não liga", "nao liga", "não funciona",
+    "nao funciona", "webcam", "câmera", "camera", "headset", "fone",
+    "microfone",
+
+    # Email (específicas — "email" e "e-mail" sozinhos NÃO contam)
+    "outlook", "correio", "caixa postal",
+
+    # Acesso (específicas)
+    "senha", "bloqueado", "bloqueada", "bloqueio", "desbloquear",
+    "esqueci",
+}
+
+
+# ---------------------------------------------------------------------
+# Chamada ao Gemini: throttle + cache + retry
 # ---------------------------------------------------------------------
 def _chamar_gemini(prompt: str) -> dict:
     global _ultima_chamada_gemini
@@ -214,6 +250,79 @@ def classificar_problema(texto: str) -> str:
     if not GEMINI_API_KEY:
         return "Outro"
     return _classificar_tipo_com_gemini(texto)
+
+
+# ---------------------------------------------------------------------
+# Abordagem D: o texto é um CHAMADO de verdade?
+# ---------------------------------------------------------------------
+def _e_chamado_com_gemini(texto: str) -> bool:
+    """
+    Pergunta ao Gemini se o texto é uma solicitação de suporte de TI.
+    Retorna True se for, False se não.
+    """
+    prompt = (
+        "Você é um classificador de e-mails de suporte de TI.\n"
+        "\n"
+        "Responda APENAS 'SIM' ou 'NAO' (sem mais nada) se o e-mail "
+        "abaixo é uma SOLICITAÇÃO DE SUPORTE DE TI que deve virar "
+        "um chamado.\n"
+        "\n"
+        "É chamado (responda SIM) quando o usuário relata um problema "
+        "de TI ou pede algo de TI. Exemplos:\n"
+        "- 'minha impressora está atolando papel'\n"
+        "- 'não consigo acessar o Outlook'\n"
+        "- 'preciso de acesso ao FlexSmart'\n"
+        "- 'o wifi caiu aqui'\n"
+        "- 'esqueci minha senha'\n"
+        "\n"
+        "NÃO é chamado (responda NAO) quando:\n"
+        "- o usuário só está pedindo pra você olhar outro e-mail\n"
+        "- é uma conversa informal ('bom dia', 'tudo bem?')\n"
+        "- é resposta a um chamado anterior\n"
+        "- é newsletter, aviso, comunicado\n"
+        "- é dúvida que não é de TI\n"
+        "- o texto é vago demais e não descreve nada acionável\n"
+        "\n"
+        f"E-mail do usuário: {texto}\n"
+        "\n"
+        "Resposta (SIM ou NAO):"
+    )
+
+    try:
+        data = _chamar_gemini(prompt)
+        resposta = (
+            data["candidates"][0]["content"]["parts"][0]["text"]
+            .strip().upper()
+        )
+        print(f"[GEMINI] 'é chamado?' → {resposta}")
+    except Exception as e:
+        print(f"[GEMINI] falhou checagem 'é chamado': {e}")
+        # Em caso de falha, ASSUME que é chamado (não perde e-mail)
+        return True
+
+    return resposta.startswith("SIM")
+
+
+def e_chamado(texto: str) -> bool:
+    """
+    Decide se o texto parece um chamado de TI.
+
+    Ordem:
+      1. Se keyword FORTE de TI bateu (impressora, wifi, etc) → SIM
+      2. Senão → pergunta pro Gemini
+    """
+    texto_lower = texto.lower()
+
+    # 1. Alguma keyword FORTE bateu? Então é chamado
+    for kw in KEYWORDS_FORTES:
+        if kw in texto_lower:
+            return True
+
+    # 2. Sem keyword forte — pergunta pro Gemini
+    if not GEMINI_API_KEY:
+        return False
+
+    return _e_chamado_com_gemini(texto)
 
 
 # ---------------------------------------------------------------------
