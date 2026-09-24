@@ -3,6 +3,12 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Pasta e-mails com erro
+emails_com_erro/
+emails_com_erro/**
+**/emails_com_erro/
+*.json.emails_com_erro
+
 # C extensions
 *.so
 
